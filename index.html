@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebXR Explorer - Meta Quest 3</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: white;
+  background: #101827;
+}
+header {
+  padding: 22px;
+  text-align: center;
+  background: #192b45;
+}
+h1 { color: #62d9ff; }
+main {
+  max-width: 850px;
+  margin: auto;
+  padding: 20px;
+}
+.panel {
+  background: #1c2b40;
+  padding: 18px;
+  border-radius: 12px;
+  margin: 15px 0;
+}
+.status { color: #80e6a0; }
+button {
+  padding: 13px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: #168dc7;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  margin: 5px;
+}
+#scene {
+  width: 100%;
+  height: 350px;
+  display: block;
+  border-radius: 10px;
+  background: #080f1c;
+}
+li { margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>🥽 WebXR Explorer</h1>
+<p>Изследователска лаборатория за Meta Quest 3</p>
+</header>
+
+<main>
+<div class="panel">
+<h2>1. Проверка на устройството</h2>
+<p id="browser">Проверка на браузъра...</p>
+<p id="xr">Проверка на WebXR...</p>
+<p id="vr">Проверка на Immersive VR...</p>
+</div>
+
+<div class="panel">
+<h2>2. 3D демонстрация</h2>
+<canvas id="scene"></canvas>
+<p>Използвайте контролерите, за да взаимодействате с обекта.</p>
+<button id="changeColor">Промени цвета</button>
+<button id="rotate">Спри/пусни въртенето</button>
+<div id="vr-button"></div>
+<p id="sessionStatus">VR сесията не е стартирана.</p>
+</div>
+
+<div class="panel">
+<h2>3. WebXR възможности</h2>
+<ul>
+<li>Immersive VR – виртуална реалност.</li>
+<li>Local Floor – подова отправна точка.</li>
+<li>Контролери – проследяване на движенията.</li>
+<li>Hand Tracking – проследяване на ръцете.</li>
+<li>Bounded Floor – граници на пространството.</li>
+</ul>
+<p id="features">Проверяват се възможностите...</p>
+</div>
+</main>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101827);
+
+const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 100);
+camera.position.set(0, 1.6, 4);
+
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true
+});
+
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+
+function resize() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334466, 2));
+
+const light = new THREE.DirectionalLight(0xffffff, 2);
+light.position.set(2, 5, 3);
+scene.add(light);
+
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshStandardMaterial({
+    color: 0x19bfff,
+    metalness: 0.3,
+    roughness: 0.25
+  })
+);
+cube.position.set(0, 1.5, -2);
+scene.add(cube);
+
+const floor = new THREE.GridHelper(20, 20, 0x55aaff, 0x34445a);
+floor.position.y = 0;
+scene.add(floor);
+
+let rotating = true;
+
+document.getElementById('changeColor').onclick = () => {
+  cube.material.color.setHSL(Math.random(), 0.8, 0.55);
+};
+
+document.getElementById('rotate').onclick = () => {
+  rotating = !rotating;
+};
+
+const controller1 = renderer.xr.getController(0);
+const controller2 = renderer.xr.getController(1);
+scene.add(controller1, controller2);
+
+function addRay(controller) {
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -3)
+  ]);
+  const ray = new THREE.Line(
+    geometry,
+    new THREE.LineBasicMaterial({ color: 0xffffff })
+  );
+  controller.add(ray);
+}
+
+addRay(controller1);
+addRay(controller2);
+
+function onSelect() {
+  cube.material.color.setHSL(Math.random(), 0.8, 0.55);
+}
+
+controller1.addEventListener('select', onSelect);
+controller2.addEventListener('select', onSelect);
+
+renderer.xr.addEventListener('sessionstart', () => {
+  document.getElementById('sessionStatus').textContent =
+    'VR сесията е активна!';
+});
+
+renderer.xr.addEventListener('sessionend', () => {
+  document.getElementById('sessionStatus').textContent =
+    'VR сесията е приключена.';
+});
+
+document.getElementById('browser').textContent =
+  'Браузър: ' + navigator.userAgent;
+
+async function checkXR() {
+  const xr = document.getElementById('xr');
+  const vr = document.getElementById('vr');
+
+  if (!navigator.xr) {
+    xr.textContent = 'WebXR API не е наличен. Използвайте съвместим браузър и HTTPS.';
+    vr.textContent = 'VR режимът не е достъпен.';
+    return;
+  }
+
+  xr.textContent = 'WebXR API: наличен';
+  xr.className = 'status';
+
+  try {
+    const supported =
+      await navigator.xr.isSessionSupported('immersive-vr');
+
+    vr.textContent = supported
+      ? 'Immersive VR: поддържа се!'
+      : 'Immersive VR: не се поддържа.';
+
+    vr.className = supported ? 'status' : '';
+  } catch (error) {
+    vr.textContent = 'Грешка при проверката на VR.';
+  }
+
+  document.getElementById('features').textContent =
+    'Допълнителните функции се заявяват при стартиране на VR сесията.';
+}
+
+checkXR();
+
+const vrButton = VRButton.createButton(renderer, {
+  optionalFeatures: [
+    'local-floor',
+    'bounded-floor',
+    'hand-tracking'
+  ]
+});
+
+document.getElementById('vr-button').appendChild(vrButton);
+
+renderer.setAnimationLoop(() => {
+  if (rotating) {
+    cube.rotation.x += 0.006;
+    cube.rotation.y += 0.01;
+  }
+  renderer.render(scene, camera);
+});
+</script>
+
+</body>
+</html>
